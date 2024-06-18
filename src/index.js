@@ -26,7 +26,7 @@ const rerender = value => {
             <h2>Hello {value}</h2>
         </div>
     )
-    Didact.render(element, container)
+    didact.render(element, container)
 }
 
 rerender("World")

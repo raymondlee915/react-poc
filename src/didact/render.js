@@ -1,13 +1,13 @@
-let wipRootFiber = null;
-let currentRootFiber = null;
-let nextUnitOfWork = null;
-let deletions = null;
+let nextUnitOfWork = null
+let currentRoot = null
+let wipRoot = null
+let deletions = null
 
 function commitRoot() {
     deletions.forEach(commitWork);
-    commitWork(wipRootFiber.child);
-    currentRootFiber = wipRootFiber;
-    wipRootFiber = null;
+    commitWork(wipRoot.child);
+    currentRoot = wipRoot;
+    wipRoot = null;
 }
 
 function commitWork(fiber) {
@@ -38,76 +38,82 @@ function commitWork(fiber) {
     commitWork(fiber.sibling)
 }
 
-const isEvent = key => key.startsWith("on");
-const isProperty = key => key !== "children" && !isEvent(key);
-const isNew = (pre, next) => key => pre[key] !== next[key];
-const isGone = (pre, next) => key => !(key in next);
-
-function updateDom(dom, preProps, nextProps) {
-    Object.keys(preProps)
+const isEvent = key => key.startsWith("on")
+const isProperty = key =>
+    key !== "children" && !isEvent(key)
+const isNew = (prev, next) => key =>
+    prev[key] !== next[key]
+const isGone = (prev, next) => key => !(key in next)
+function updateDom(dom, prevProps, nextProps) {
+    //Remove old or changed event listeners
+    Object.keys(prevProps)
         .filter(isEvent)
-        .filter(key => !(key in nextProps) || isNew(preProps, nextProps)(key))
+        .filter(
+            key =>
+                !(key in nextProps) ||
+                isNew(prevProps, nextProps)(key)
+        )
         .forEach(name => {
             const eventType = name
                 .toLowerCase()
-                .substring(2);
-
-            dom.removeEventListener(eventType, preProps[name]);
-        });
-
-    //Remove old properties
-    Object.keys(preProps)
-        .filter(isProperty)
-        .filter(isGone(preProps, nextProps))
-        .forEach(name => {
-            dom[name] = "";
-        });
-
-    //set new or changed properties
-    Object.keys(nextProps)
-        .filter(isProperty)
-        .filter(isNew(preProps, nextProps))
-        .forEach(name => {
-            dom[name] = nextProps[name];
-        });
-
-
-    //Add event listeners
-    Object.keys(nextProps)
-    .filter(isEvent)
-    .filter(isNew(preProps, nextProps))
-    .forEach(name =>{
-        const eventType = name.toLowerCase().substring(2);
-
-        dom.addEventListener(eventType, nextProps[name]);
-    })
-}
-
-export function render(element, container) {
-    wipRootFiber = {
-        dom: container,
-        props: {
-            children: [element]
-        },
-        alternate: currentRootFiber
-    }
-    deletions = [];
-    nextUnitOfWork = wipRootFiber;
-}
-
-
-function createDom(fiber) {
-    const dom = fiber.type === "TEXT_ELEMENT"
-        ? document.createTextNode("")
-        : document.createElement(fiber.type)
-    const isProperty = key => key !== "children"
-    Object.keys(fiber.props)
-        .filter(isProperty)
-        .forEach(name => {
-            dom[name] = fiber.props[name]
+                .substring(2)
+            dom.removeEventListener(
+                eventType,
+                prevProps[name]
+            )
         })
 
-    return dom;
+    // Remove old properties
+    Object.keys(prevProps)
+        .filter(isProperty)
+        .filter(isGone(prevProps, nextProps))
+        .forEach(name => {
+            dom[name] = ""
+        })
+
+    // Set new or changed properties
+    Object.keys(nextProps)
+        .filter(isProperty)
+        .filter(isNew(prevProps, nextProps))
+        .forEach(name => {
+            dom[name] = nextProps[name]
+        })
+
+    // Add event listeners
+    Object.keys(nextProps)
+        .filter(isEvent)
+        .filter(isNew(prevProps, nextProps))
+        .forEach(name => {
+            const eventType = name
+                .toLowerCase()
+                .substring(2)
+            dom.addEventListener(
+                eventType,
+                nextProps[name]
+            )
+        })
+}
+export function render(element, container) {
+    wipRoot = {
+        dom: container,
+        props: {
+            children: [element],
+        },
+        alternate: currentRoot,
+    }
+    deletions = []
+    nextUnitOfWork = wipRoot
+}
+
+function createDom(fiber) {
+    const dom =
+        fiber.type == "TEXT_ELEMENT"
+            ? document.createTextNode("")
+            : document.createElement(fiber.type)
+
+    updateDom(dom, {}, fiber.props)
+
+    return dom
 }
 
 function workLoop(deadline) {
@@ -119,7 +125,7 @@ function workLoop(deadline) {
         shouldYield = deadline.timeRemaining() < 1
     }
 
-    if (!nextUnitOfWork && wipRootFiber) {
+    if (!nextUnitOfWork && wipRoot) {
         commitRoot();
     }
 
